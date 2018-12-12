@@ -27,7 +27,7 @@ print(v3)
 conv <- function(word, j) {
     az = letters # alphabet
     n.j = match(substr(word, j, j), az)
-    new_k = ((j * n.j) %% length(az) + 1)
+    new_k = ((j * (n.j - 1)) %% length(az) + 1)
     new = az[new_k]
     return(new)
 }
@@ -38,6 +38,7 @@ conv2 <- function(word) {
     }
     return(res)
 }
+conv2("anotherphrase")
 conv2("beef")
 
 
@@ -56,10 +57,12 @@ mons = month.name
 k.3 = (Nvar-1) %% 12 + 1
 nms = array(c(mons[k.3:12],mons[1:(k.3-1)]), 13)
 nms -> rownames(m) -> colnames(m)
+m
 
 # filter out by names
 is_ok.3 = (substring(nms, 1, 1) > "F") # not A-F
 m1 = m[is_ok.3, is_ok.3]
+m1
 
 # results
 det(m1) # ==0
@@ -83,7 +86,7 @@ t.4 <- data.frame(
     fac=as.factor(c('a','b','b','a','b')),
     stringsAsFactors=FALSE
 )
-
+t.4
 # Вывести все такие текстовые значения для заданного фактора, 
 # для которых числовые значения больше заданного значения.
 print(
@@ -119,8 +122,8 @@ t.5 <- data.frame(
 # FIRST: Without cycles or anything
 f5.a <- function(tbl) {
     n = nrow(tbl)
-    mults = mp(seti, 5)  # multipliers
-    cls = paste("x", mp(seti, 3), sep="")  # columns
+    mults = mp(1:n, 5)  # multipliers
+    cls = paste("x", mp(1:n, 3), sep="")  # columns
     rws = 1:n  # rows
     pws = 1:n  # powers
     mtx = mults * diag(as.matrix(t.5[rws, cls]))^pws
