@@ -1,0 +1,247 @@
+---
+title: "Lab work 4."
+author: "Anatoly Makarevich"
+date: '2018-12-13'
+output: html_document
+bibliography: bibliography.bib
+
+---
+
+```{r setup, include=FALSE}
+library(crayon)
+#library(xtable)
+library(knitr)
+library(moments)
+
+library(arm)  # pretty histogram plot :)
+
+library(fitdistrplus)  # 
+```
+
+```{r , echo=TRUE}
+Nvar = 30 %% 24  # == 6
+```
+
+### Exercise 1
+
+Generate 200 elements from (Var 6) *geometric(0.8)*. 
+
+Output the following:
+
+- first 10 and last 20.
+
+- min, max
+
+- mean, sd, median, skewness(assymetry), kurtosis, 25th/75th/95th percentiles
+
+
+```{r , echo=TRUE}
+# Geom (0.8)
+sample <- rgeom(200, 0.8)
+
+P <- function(txt, val, round_to=4) {
+  val2 <- round(val, round_to)
+  print(txt %+% as.character(val2))
+}
+
+show_it <- function(sample) {
+  print("Head and tail:")
+  print(sample[1:10])
+  print(sample[(length(sample) - 20) : length(sample)])
+  
+  P("Min: ", min(sample))
+  P("Max: ", max(sample))
+  P("Median: ", median(sample))
+  P("Mean: ", mean(sample))
+  P("SD: ", sd(sample))
+  print("Quantiles:")
+  quantile(sample, probs = c(0.25, 0.75, 0.95))
+  P("Skewness: ", skewness(sample))
+  P("Kurtosis: ", kurtosis(sample))
+}
+```
+
+
+Using an **alternate** method to print (it's a lot cleaner! its\_so\_awesome).
+
+```{r, echo=FALSE}
+p=0.8
+print(
+  c(
+    mean=(1-p)/p, 
+    sd=(1-p)^0.5/p, 
+    median=qgeom(0.5, p), 
+    skew=(2-p)/(1-p)^0.5, 
+    kurtosis=6+p^2/(1-p),
+    quantile=qgeom(c("25%"=0.25,"75%"=0.75,"95%"=0.95), p)
+  )
+)
+
+```
+
+
+Some of the formulas used:
+
+$$ \mu = \frac{1}{p}; \quad 
+\hat{\mu}= \frac{1}{n}  \sum \limits _{i=1} ^{n} x_{i}; \quad
+
+\kappa = 6 + \frac{p^2}{\sqrt{1-p}}
+$$
+
+
+##### Boxplot:
+
+```{r, echo=FALSE}
+boxplot(sample)
+title("Water Dropping Onto a Plate (Boxplot)")
+```
+
+
+
+```{r}
+plot.ecdf(sample, main="Archery Practice (ECDF)")
+```
+
+#### Histogram, theoretical and actual
+
+```{r, echo=FALSE}
+x <- min(sample):max(sample)
+y <- dgeom(x, p=0.8)
+
+discrete.histogram(x, table(sample), y, xlab="sample (blue), theoretical (red)")
+title("Actually looks pretty good!")
+```
+
+***
+
+
+### Exercise 2
+
+Using the Kolmogorov–Smirnov test doesn't work as we have a discrete distribution. 
+
+```{r, echo=FALSE}
+ks.test(sample, "pgeom", p=0.8, alternative = "two.sided")
+```
+
+Chi-squared (Pearson) test:
+
+```{r, include=FALSE}
+
+test_geom <- function(sample, p=0.8, debug=F) {
+  table(sample)
+  mmx <- seq(min(sample), max(sample))
+  pm <- pgeom(mmx, p=p)
+  pmf <- pm - c(0, pm[1:length(pm)-1])
+  
+  e_tbl <- as.vector(table(sample))
+  
+  tbl <- pmf * sum(e_tbl)
+  
+  while(length(e_tbl)<length(tbl)) {
+    e_tbl <- c(e_tbl, 0)
+  }
+  
+  all_tbl <- rbind(e_tbl, tbl)
+  if (debug) { print(all_tbl) }
+  
+  chi <- chisq.test(e_tbl, tbl, simulate.p.value = TRUE)
+  return(chi)
+}
+
+bad_test_geom <- function(sample, k=20) {
+  interval <- seq(min(sample), max(sample), length.out = k+1)
+  empiric <- hist(sample, breaks = interval, plot = F)
+  interval[1] <- -Inf
+  interval[k+1] <- +Inf
+  teor_p <- pgeom(interval, p = 0.8)
+  teor_p <- teor_p[2:(k+1)] - teor_p[1:k]
+  chi <- chisq.test(empiric$counts, teor_p, simulate.p.value = TRUE)
+  return(chi)
+}
+
+
+
+```
+```{r, echo=FALSE}
+chi <- test_geom(sample, 0.8, debug=T)
+chi
+```
+
+
+
+```{r, echo=T}
+descdist(sample, discrete = T)
+```
+
+
+```{r, echo=F}
+fit.geom <- fitdist(sample, distr="geom", method='mle', discrete=T, lower = c(0.1))
+plot(fit.geom)
+fit.geom
+```
+
+
+
+***
+
+### Exercise 3
+
+Using Chi-squared test [@Nobody06], we get the following:
+
+```{r}
+
+count_num_bad <- function(N=1000, num_per=200, alpha=0.05) {
+  count <- 0
+  
+  for (i in 1:1000) {
+    x <- rgeom(num_per, p=0.8)
+    chisq <- test_geom(x, p=0.8)
+    if(chisq$p.value < alpha) 
+      count <- count + 1
+  }
+  return(count)
+}
+N_d=1000
+print(paste("Number of 'bad' out of", N_d, "at (0.05) is:", count_num_bad(N=N_d, num_per=200, alpha=0.05)))
+
+```
+
+***
+
+### Задание 4
+
+Имеем следующую функцию:
+```{r}
+
+friendly_test_geom <- function(sample, p=0.8, alpha = 0.05){
+  chisq <- test_geom(sample, p=p)
+  s <- ""
+  if (chisq$p.value < alpha){
+    s <- " not"
+  }
+  
+  res <- paste0(
+    "For significance level alpha=", alpha, 
+    ", the sample does", s, " conform to the ", "Geom(0.8)", 
+    " distribution."
+  )
+  return(res)
+}
+```
+
+
+```{r, include=FALSE}
+print(friendly_test_geom(sample, alpha=0.05))
+print(friendly_test_geom(sample, alpha=0.001))
+print(friendly_test_geom(sample, alpha=1e-7))
+```
+
+***
+
+### Bibliography
+
+
+
+
+
+
